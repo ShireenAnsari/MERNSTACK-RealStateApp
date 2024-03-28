@@ -48,10 +48,11 @@ const _useauth = () => {
   return {handlesignup,loading}
 }
 const useLogin = () => {
-
-  const [loading,setloading]=useState(false)
-  const[error,seterror]=useState(false)
-	// const { setAuthUser } = useAuthContext();
+  const {loading,error} = useSelector((state) => {
+    console.log(state?.persistedReducer.user
+        );
+    return state?.persistedReducer.user;
+  });
     const dispatch=useDispatch()
     const route=useNavigate();
 
@@ -75,25 +76,23 @@ const useLogin = () => {
           
         } catch (error) {
           
-            if(error.response.status===409)
+            if(error.response.status===405)
             {
                 toast.error(error.response?.data.message);
                 console.log(error.response.data.message)
             }
-            if(error.response.status===400)
+            if(error.response.status===403)
             {
                 toast.error(error.response?.data.message);
                 console.log(error.response.data.message)
             }
-            if(error.response.status===401)
+            if(error.response.status===406)
             {
-                toast.error('Username or Password is required');
+                toast.error(error.response?.data.message);
                 console.log(error.response.data.message)
             }
+          
             console.log(error);
-        }
-        finally{
-            
         }
 	};
 

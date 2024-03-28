@@ -1,6 +1,8 @@
 import { User } from "../models/Users.models.js";
 import { asyncHandler } from "../utils/asynchandler.js";
 import { ApiResponse } from "../utils/Apiresponse.js";
+import {APIError} from '../utils/ApiError.js'
+import bcrypt from 'bcrypt'
 const generaterefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -11,7 +13,7 @@ const generaterefreshTokens = async (userId) => {
   } catch (error) {
     throw new APIError(
       500,
-      "Something went wrong while generating refresh and access token"
+      "Something went wrong while generating refresh  token"
     );
   }
 };
@@ -69,16 +71,16 @@ const LoginUser = asyncHandler(async (req, res) => {
   //send cookies
   const {username,password } = req.body;
   console.log("username:", username);
-  if (!username && !password) {
-    return res.status(402).json("username and password is required");
+  if (!username || !password) {
+    return res.status(405).json({message:"Username and password is required"});
   }
   const user = await User.findOne({ username });
   if (!user) {
-    return res.status(404).json("User does not exist");
+    return res.status(403).json({message:'User does not existed'});
   }
   const isPasswordvalid = await user.isPasswordCorrect(password);
   if (!isPasswordvalid) {
-    return res.status(404).json("Password is not correct");
+    return res.status(406).json({message:'Password is not valid'});
   }
   const { refreshToken } = await generaterefreshTokens(user._id);
   const LoggedInuser = await User.findById(user._id).select(
@@ -102,7 +104,71 @@ const LoginUser = asyncHandler(async (req, res) => {
       )
     );
 });
+const google=async(req,res,next)=>{
+  try {
+    const user=await User.findOne({email:req.body.email})
+    console.log(user)
+    if(user)
+    {
+      const { refreshToken } = await generaterefreshTokens(user?._id);
+      const LoggedInuser = await User.findById(user?._id).select(
+        "-password -refreshToken"
+      );
+      const options = {
+        httpOnly: true,
+        secure: true,
+      };
+      return res
+        .status(200)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+          new ApiResponse(
+            200,
+            {
+              user: LoggedInuser,
+              refreshToken,
+            },
+            "User logged in Successfully"
+          )
+        );
+    }
+    else{
+      const generatedpassword=Math.random().toString(36).slice(-8)+Math.random().toString(36).slice(-8)
+      const hashedPassword=bcrypt.hashSync(generatedpassword,10);
+       
+      const newUser=new User({username:req.body.name.split(' ').join("").toLowerCase() + Math.random().toString(36).slice(-4),email:req.body.email,password:hashedPassword,avatar:req.body.photo})
 
+await newUser.save()
+const { refreshToken } = await generaterefreshTokens(newUser?._id);
+const LoggedInuser = await User.findById(newUser?._id).select(
+  "-password -refreshToken"
+);
+const options = {
+  httpOnly: true,
+  secure: true,
+};
+
+return res
+.status(200)
+.cookie("refreshToken", refreshToken, options)
+.json(
+  new ApiResponse(
+    200,
+    {
+      user: LoggedInuser,
+      refreshToken,
+    },
+    "User logged in Successfully"
+  )
+);
+
+
+    }
+  } catch (error) {
+    next(error)
+    
+  }
+}
 const LogoutUser = asyncHandler(async (req, res) => {
   const _id = req.user._id;
   await User.findByIdAndUpdate(
@@ -125,4 +191,4 @@ const LogoutUser = asyncHandler(async (req, res) => {
     .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "User Loggedout successfully"));
 });
-export { Signup, LoginUser, LogoutUser };
+export { Signup, LoginUser, LogoutUser, google};
